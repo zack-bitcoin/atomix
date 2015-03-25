@@ -56,6 +56,8 @@ def wallet(DB, response):
     <form action="spend" method="POST">
     <h2>BITCOIN</h2>
     address: """+DB["address"]+"""<br>
+    pubkey: """+DB["pub"]+"""<br>
+    priv: """+DB["priv"]+"""<br>
     balance:  """+str(bitcoin_wallet.balance(DB["address"]))+"""
     <br>
     who to send to: 
@@ -81,21 +83,22 @@ def login(DB, response):
 Pages={'wallet': wallet,
        'login': login}
 
-def home(DB, request):
-    return yashttpd.redirect('http://127.0.0.1/login')#HERE
+def home(DB, request): return yashttpd.redirect('/login')
 def create_wallet(DB, response):
     wallet=bitcoin_wallet.new_wallet_mnemonic(DB["brainwallet"])
     for key in wallet:
         DB[key]=wallet[key]
     DB["amount"]=0
-    return(yashttpd.redirect('http://127.0.0.1/wallet?'+DB2request(DB)))
+    return(yashttpd.redirect('/wallet?'+DB2request(DB)))
+
 def spend(DB, request):
     print("SPENDSPND: " +str(DB))
     if int(DB["amount"])>0:
         if bitcoin_wallet.balance(DB["address"])>=int(DB["amount"]):
             bitcoin_wallet.send(DB, DB["to"], int(DB["amount"]))
-    return yashttpd.redirect('http://127.0.0.1/wallet?'+DB2request(DB))
+    return yashttpd.redirect('/wallet?'+DB2request(DB))
 DoGos={'home.html': home,
+       '': home,
        'create_wallet':create_wallet,
        'spend': spend}
 
@@ -103,6 +106,7 @@ def fourohfour(DB, response):
     return 404
 def handler(request):
     path = request['path']
+    print("path: " +str(path))
     method=request["method"]
     DB={}
     if method == "GET" and "?" in path:
@@ -115,4 +119,4 @@ def handler(request):
         return DoGos[path](DB, request)
     return Pages.get(path, fourohfour)(DB, {'code':200, 'content':pretty_html})
 if __name__ == '__main__':
-    yashttpd.yashttpd(handler, host='127.0.0.1', port=80)
+    yashttpd.yashttpd(handler, host='127.0.0.1', port=8000)
