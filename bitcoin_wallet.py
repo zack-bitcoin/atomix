@@ -1,3 +1,4 @@
+import re
 import bitcoin as b
 #refunds might not work due to the transaction maliability bug.
 fee=20000
@@ -19,38 +20,64 @@ def balance(address):
 def mk_spend_txids(wallet, dst, amount, h):
     l=len(h)
     outs = [{'value': int(amount), 'address': dst}]
-    print("h: " +str(h))
-    print("outs: " +str(outs))
-    print("wallet: " +str(wallet))
-    print("amount: " +str(amount))
     tx = b.mksend(h,outs, wallet["address"], fee)
     for i in range(l):
         tx=b.sign(tx, i, wallet["priv"])
     return(tx)
 def mk_spend(wallet, dst, amount):
     h = b.history(wallet["address"])
-    h = filter(lambda(x): 'spend' not in x, h)
-    print("h: " +str(h))
-    print("spend: " +str(amount))
+    h = filter(lambda x: 'spend' not in x, h)
     return mk_spend_txids(wallet, dst, amount, h)
 def send(wallet, dst, amount): return b.pushtx(mk_spend(wallet, dst, amount))
-#def txid(tx): return b.sha256(tx.decode("hex"))
 def txid(tx): return b.txhash(tx)
+SIGHASH_ALL=1
+def sign(tx, i, priv, t="default", hashcode=SIGHASH_ALL):
+    i = int(i)
+    #if (not is_python2 and isinstance(re, bytes)) or not re.match('^[0-9a-fA-F]*$', tx):
+    if not re.match('^[0-9a-fA-F]*$', tx):
+        return binascii.unhexlify(custom_sign(safe_hexlify(tx), i, priv, hashcode))
+    if len(priv) <= 33:
+        priv = b.safe_hexlify(priv)
+    pub = b.privkey_to_pubkey(priv)
+    address = b.pubkey_to_address(pub)
+    print("normal tx"+b.mk_pubkey_script(address))
+    signing_tx = b.signature_form(tx, i, b.mk_pubkey_script(address), hashcode)
+    sig = b.ecdsa_tx_sign(signing_tx, priv, hashcode)
+    txobj = b.deserialize(tx)
+    if t=="atomic_1":
+        txobj["ins"][i]["script"] = b.serialize_script([sig])
+    if t=="atomic_2":
+        [old_sig] = txobj["ins"][i]["script"]
+        txobj["ins"][i]["script"] = b.serialize_script([old_sig, sig])
+    else:
+        txobj["ins"][i]["script"] = serialize_script([sig, pub])
+    return b.serialize(txobj)
+def atomic_sign_2(tx, i, priv, hashcode=SIGHASH_ALL):
+    return sign(tx, i, priv, "atomic_2", hashcode)
+def atomic_sign_1(tx, i, priv, hashcode=SIGHASH_ALL):
+    return sign(tx, i, priv, "atomic_1", hashcode)
+
 def atomic(peer_pub, wallet, to, send, receive, secret_hash):
-    tx=mk_spend(wallet, to, send)#puts your money into the channel.
-    tx=b.deserialize(tx)
-    tx['outs'][0]['script']="6382"+peer_pub+wallet["pub"]+"82ae67a9"+secret_hash+"87"+peer_pub+"ad68"
+    tx1=mk_spend(wallet, to, send)#puts your money into the channel.
+    tx=b.deserialize(tx1)
+    #print("deserial: " +str(tx))
+    script="6382"+peer_pub+wallet["pub"]+"82ae67a9"+secret_hash+"87"+peer_pub+"ad68"
+    tx['outs'][0]['script']=script
+    # signing_tx = b.signature_form(tx1, 0, script, 1)#sighash_all
+    # sig = b.ecdsa_tx_sign(signing_tx, wallet["priv"], 1)#sighash_all
+    # tx["ins"][0]["script"] = b.serialize_script([sig])
+    #print("with in: " +str(tx))
     tx=b.serialize(tx)
-    txd=txid(tx)
-    print("txid: " +str(txd))
-    txd={'output':(txd+':1'), 'block_height':None, 'value':send, 'address':wallet['address']}
-    print("txd: " +str(txd))
-    print("send: " +str(send))
-    refund_tx=mk_spend_txids(wallet, wallet["address"], send-fee, [txd])
-    print("txid2: " +str(txid(refund_tx)))
-    print("tx2: " +str(refund_tx))
-    tx3=b.sign(refund_tx, 0, wallet["priv"])
-    print("tx3: " +str(tx3))
+    print("befor signed: " +str(b.deserialize(tx)))
+    tx2=atomic_sign_1(tx, 0, wallet["priv"])
+    print("signed: " +str(b.deserialize(tx2)))
+
+    #txd=txid(tx)
+    #txd={'output':(txd+':1'), 'block_height':None, 'value':send, 'address':wallet['address']}
+    #refund_tx=mk_spend_txids(wallet, wallet["address"], send-fee, [txd])
+    #tx3=b.sign(refund_tx, 0, wallet["priv"])
+    #print("tx3: " +str(tx3))
+    #sig=b.ecdsa_tx_sign(tx, wallet["priv"], 1)
 "6382{pubkey a}{pubkey b}82ae67a9{H(x)}87{pubkey a}ad68"
 #OP_IF
 #// Refund for B
