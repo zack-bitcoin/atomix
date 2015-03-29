@@ -62,7 +62,7 @@ def txid(tx): return b.txhash(tx)
 def atomic(peer_pub, wallet, to, send, receive, secret_hash):
     tx1=mk_spend(wallet, to, send)#puts your money into the channel.
     tx=b.deserialize(tx1)
-    script="6352"+peer_pub+wallet["pub"]+"52af67a9"+secret_hash+"87"+peer_pub+"ad68"
+    script="6352"+peer_pub+wallet["pub"]+"52af67aa"+secret_hash+"87"+peer_pub+"ad68"
     print("script: " +str(script))
     tx['outs'][0]['script']=script
     tx=b.serialize(tx)
@@ -75,7 +75,7 @@ def atomic(peer_pub, wallet, to, send, receive, secret_hash):
     #tx2=atomic_sign_1(refund_tx, 0, wallet["priv"], script)
     #print("tx2: " +str(tx2))
 
-"6352{pubkey a}{pubkey b}52af67a9{H(x)}87{pubkey a}ad68"
+"6352{pubkey a}{pubkey b}52af67aa{H(x)}87{pubkey a}ad68"
 #OP_IF
 #// Refund for B
 #2 <pubkeyA> <pubkeyB> 2 OP_CHECKMULTISIGVERIFY
