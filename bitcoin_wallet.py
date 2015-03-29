@@ -59,10 +59,15 @@ def atomic_sign_2(tx, i, priv, script):
 def atomic_sign_1(tx, i, priv, script):
     return sign(tx, i, priv, "atomic_1", script)
 def txid(tx): return b.txhash(tx)
+def serialize(x): 
+    a=hex(len(x)/2)[2:]
+    if len(a)%2 != 0: 
+        a="0"+a
+    return a+x
 def atomic(peer_pub, wallet, to, send, receive, secret_hash):
     tx1=mk_spend(wallet, to, send)#puts your money into the channel.
     tx=b.deserialize(tx1)
-    script="6352"+peer_pub+wallet["pub"]+"52af67aa"+secret_hash+"87"+peer_pub+"ad68"
+    script="6352"+serialize(peer_pub)+serialize(wallet["pub"])+"52af67aa"+serialize(secret_hash)+"87"+serialize(peer_pub)+"ad68"
     print("script: " +str(script))
     tx['outs'][0]['script']=script
     tx=b.serialize(tx)
